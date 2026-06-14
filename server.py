@@ -217,13 +217,14 @@ class _Handler(BaseHTTPRequestHandler):
         length = min(int(self.headers.get("Content-Length", 0)), 1024)
         body = self.rfile.read(length)
         client_t_ms = _parse_client_ts(body)
-        if client_t_ms is not None:
-            latency_ms = _now_ms_since_midnight() - client_t_ms
-            logger.info("POST received  client_t=%.0f ms  latency=%.0f ms", client_t_ms, latency_ms)
-            t_ms = client_t_ms
-        else:
-            logger.info("POST received  server_t=%.0f ms  body=%s", server_t_ms, body)
-            t_ms = server_t_ms
+        if client_t_ms is None:
+            logger.warning("POST rejected: missing/invalid timestamp  body=%s", body)
+            self.send_response(400)
+            self.end_headers()
+            return
+        latency_ms = _now_ms_since_midnight() - client_t_ms
+        logger.info("POST received  client_t=%.0f ms  latency=%.0f ms", client_t_ms, latency_ms)
+        t_ms = client_t_ms
         _decoder.press(t_ms)
         self.send_response(200)
         self.end_headers()
