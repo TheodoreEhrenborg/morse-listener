@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import ssl
 import threading
 import time
 import urllib.request
@@ -8,6 +9,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional
+
+import certifi
+
+_SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
 logging.basicConfig(
     level=logging.INFO,
@@ -114,7 +119,7 @@ class MorseDecoder:
         if not self._symbols:
             return
         code = "".join(self._symbols)
-        char = MORSE.get(code, "?")
+        char = MORSE.get(code) or f"undecipherable({code})"
         logger.info("letter  %s → %r", code, char)
         self._chars.append(char)
         self._symbols.clear()
@@ -161,6 +166,7 @@ class NtfyPoster:
                         f"https://ntfy.sh/{self._topic}",
                         data=message.encode(),
                     ),
+                    context=_SSL_CTX,
                     timeout=10,
                 )
                 self._last_len = len(text)
