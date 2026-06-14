@@ -136,7 +136,7 @@ _decoder = MorseDecoder()
 class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         t_ms = time.monotonic() * 1000.0
-        length = int(self.headers.get("Content-Length", 0))
+        length = min(int(self.headers.get("Content-Length", 0)), 1024)
         self.rfile.read(length)
         logger.info("POST received  t=%.0f ms", t_ms)
         _decoder.press(t_ms)
