@@ -23,8 +23,8 @@ def send_text(
     text: str,
     url: str = "http://localhost:8765/",
     dash_gap_s: float = 0.05,
-    symbol_gap_s: float = 0.3,
-    letter_gap_s: float = 0.8,
+    symbol_gap_s: float = 1.5,
+    letter_gap_s: float = 4.0,
 ) -> None:
     """Encode text as morse and send POST requests to the server."""
     first_char = True

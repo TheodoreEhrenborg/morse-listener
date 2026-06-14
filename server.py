@@ -1,8 +1,11 @@
 import argparse
 import logging
+import os
 import threading
 import time
+import urllib.request
 from dataclasses import dataclass
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional
 
@@ -27,8 +30,8 @@ MORSE = {
 
 @dataclass
 class MorseConfig:
-    dash_gap_ms: float = 100.0   # two presses closer than this → dash
-    letter_gap_ms: float = 1500.0  # silence ≥ this → end of letter
+    dash_gap_ms: float = 1000.0  # two presses closer than this → dash
+    letter_gap_ms: float = 3000.0  # silence ≥ this → end of letter
 
 
 class MorseDecoder:
@@ -130,6 +133,58 @@ class MorseDecoder:
             self._chars.clear()
 
 
+class NtfyPoster:
+    def __init__(self, topic: str, interval_s: float, decoder: MorseDecoder) -> None:
+        self._topic = topic
+        self._interval_s = interval_s
+        self._decoder = decoder
+        self._last_len = 0
+        self._timer: Optional[threading.Timer] = None
+
+    def start(self) -> None:
+        self._schedule()
+
+    def _schedule(self) -> None:
+        self._timer = threading.Timer(self._interval_s, self._post)
+        self._timer.daemon = True
+        self._timer.start()
+
+    def _post(self) -> None:
+        text = self._decoder.get_text()
+        new_text = text[self._last_len:]
+        if new_text:
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+            message = f"[{ts}] {new_text}"
+            try:
+                urllib.request.urlopen(
+                    urllib.request.Request(
+                        f"https://ntfy.sh/{self._topic}",
+                        data=message.encode(),
+                    ),
+                    timeout=10,
+                )
+                self._last_len = len(text)
+                logger.info("ntfy posted: %r", message)
+            except Exception as exc:
+                logger.error("ntfy failed: %s", exc)
+        else:
+            logger.debug("ntfy: nothing new to post")
+        self._schedule()
+
+
+def _load_dotenv(path: str = ".env") -> None:
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except FileNotFoundError:
+        pass
+
+
 _decoder = MorseDecoder()
 
 
@@ -147,9 +202,18 @@ class _Handler(BaseHTTPRequestHandler):
         pass  # suppress default access log
 
 
-def run(host: str = "0.0.0.0", port: int = 8765, config: Optional[MorseConfig] = None) -> None:
+def run(
+    host: str = "0.0.0.0",
+    port: int = 8765,
+    config: Optional[MorseConfig] = None,
+    ntfy_topic: Optional[str] = None,
+    ntfy_interval_s: float = 600.0,
+) -> None:
     global _decoder
     _decoder = MorseDecoder(config)
+    if ntfy_topic:
+        NtfyPoster(ntfy_topic, ntfy_interval_s, _decoder).start()
+        logger.info("ntfy topic=%s  interval=%.0f s", ntfy_topic, ntfy_interval_s)
     server = HTTPServer((host, port), _Handler)
     logger.info("Listening on %s:%d  dash_gap=%.0f ms  letter_gap=%.0f ms",
                 host, port, _decoder._cfg.dash_gap_ms, _decoder._cfg.letter_gap_ms)
@@ -157,12 +221,27 @@ def run(host: str = "0.0.0.0", port: int = 8765, config: Optional[MorseConfig] =
 
 
 if __name__ == "__main__":
+    _load_dotenv()
     p = argparse.ArgumentParser(description="Morse code listener")
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=8765)
-    p.add_argument("--dash-gap-ms", type=float, default=100.0,
-                   help="Two presses within this interval form a dash (default: 100)")
-    p.add_argument("--letter-gap-ms", type=float, default=1500.0,
-                   help="Silence ≥ this interval ends the current letter (default: 1500)")
+    p.add_argument("--dash-gap", type=float, default=1000.0,
+                   help="Two presses within this interval form a dash (default: 1000 ms)")
+    p.add_argument("--letter-gap", type=float, default=3000.0,
+                   help="Silence ≥ this interval ends the current letter (default: 3000 ms)")
+    p.add_argument("--ntfy-interval", type=float, default=10.0,
+                   help="Minutes between ntfy.sh posts (default: 10)")
+    p.add_argument("--no-ntfy", action="store_true",
+                   help="Disable ntfy.sh posting")
     args = p.parse_args()
-    run(args.host, args.port, MorseConfig(args.dash_gap_ms, args.letter_gap_ms))
+
+    ntfy_topic: Optional[str] = None
+    if not args.no_ntfy:
+        ntfy_topic = os.environ.get("NTFY_SH_TOPIC")
+        if not ntfy_topic:
+            p.error("NTFY_SH_TOPIC not set in environment or .env — pass --no-ntfy to skip")
+
+    run(args.host, args.port,
+        MorseConfig(args.dash_gap, args.letter_gap),
+        ntfy_topic=ntfy_topic,
+        ntfy_interval_s=args.ntfy_interval * 60)

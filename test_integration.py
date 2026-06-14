@@ -59,3 +59,22 @@ def test_hi(server_url):
     send_text("HI", url, **CLIENT_KW)
     time.sleep(FLUSH_WAIT_S)
     assert decoder.get_text() == "HI"
+
+
+def test_default_configs_are_compatible():
+    """Ensure client.py defaults work with server.py defaults (no custom timing overrides)."""
+    default_cfg = MorseConfig()
+    decoder = MorseDecoder(default_cfg)
+    srv._decoder = decoder
+
+    httpd = HTTPServer(("127.0.0.1", 0), _Handler)
+    port = httpd.server_address[1]
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        send_text("A B C", f"http://127.0.0.1:{port}/")  # client defaults
+        time.sleep((default_cfg.letter_gap_ms + 100) / 1000.0)
+        assert decoder.get_text() == "ABC"
+    finally:
+        httpd.shutdown()
