@@ -1,7 +1,7 @@
 [project]
 name = "morse-listener"
 version = "0.1.0"
-description = "Add your description here"
+description = "Decode Morse code from timed HTTP button presses and push the text to ntfy.sh"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["certifi"]
