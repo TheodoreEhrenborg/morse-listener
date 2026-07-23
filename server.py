@@ -217,17 +217,12 @@ def _parse_client_ts(body: bytes) -> Optional[float]:
         return None
 
 
-def _now_ms_since_midnight() -> float:
-    n = datetime.now()
-    return (n.hour * 3600 + n.minute * 60 + n.second) * 1000.0 + n.microsecond / 1000.0
-
 
 _decoder = MorseDecoder()
 
 
 class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
-        server_t_ms = time.monotonic() * 1000.0
         length = min(int(self.headers.get("Content-Length", 0)), 1024)
         body = self.rfile.read(length)
         client_t_ms = _parse_client_ts(body)
@@ -236,8 +231,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_response(400)
             self.end_headers()
             return
-        latency_ms = _now_ms_since_midnight() - client_t_ms
-        logger.info("POST received  client_t=%.0f ms  latency=%.0f ms", client_t_ms, latency_ms)
+        logger.info("POST received  client_t=%.0f ms", client_t_ms)
         t_ms = client_t_ms
         _decoder.press(t_ms)
         self.send_response(200)
