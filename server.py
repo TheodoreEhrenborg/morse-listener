@@ -15,11 +15,17 @@ import certifi
 
 _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s.%(msecs)03d %(levelname)s %(message)s",
+LOG_FILE = os.environ.get("MORSE_LOG_FILE", "morse.log")
+
+_log_formatter = logging.Formatter(
+    "%(asctime)s.%(msecs)03d %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
+_console_handler = logging.StreamHandler()
+_console_handler.setFormatter(_log_formatter)
+_file_handler = logging.FileHandler(LOG_FILE)
+_file_handler.setFormatter(_log_formatter)
+logging.basicConfig(level=logging.INFO, handlers=[_console_handler, _file_handler])
 logger = logging.getLogger(__name__)
 
 MORSE = {
