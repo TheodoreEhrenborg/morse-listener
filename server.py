@@ -42,8 +42,8 @@ MORSE = {
 
 @dataclass
 class MorseConfig:
-    dash_gap_ms: float = 2000.0  # two presses closer than this → dash
-    letter_gap_ms: float = 6000.0  # silence ≥ this → end of letter
+    dash_gap_ms: float = 4000.0  # two presses closer than this → dash
+    letter_gap_ms: float = 12000.0  # silence ≥ this → end of letter
 
 
 class MorseDecoder:
@@ -270,10 +270,10 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Morse code listener")
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=8765)
-    p.add_argument("--dash-gap", type=float, default=2000.0,
-                   help="Two presses within this interval form a dash (default: 2000 ms)")
-    p.add_argument("--letter-gap", type=float, default=6000.0,
-                   help="Silence ≥ this interval ends the current letter (default: 6000 ms)")
+    p.add_argument("--dash-gap", type=float, default=4000.0,
+                   help="Two presses within this interval form a dash (default: 4000 ms)")
+    p.add_argument("--letter-gap", type=float, default=12000.0,
+                   help="Silence ≥ this interval ends the current letter (default: 12000 ms)")
     p.add_argument("--ntfy-interval", type=float, default=10.0,
                    help="Minutes between ntfy.sh posts (default: 10)")
     p.add_argument("--no-ntfy", action="store_true",
