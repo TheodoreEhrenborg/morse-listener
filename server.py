@@ -52,6 +52,7 @@ class MorseDecoder:
         self._symbols: list[str] = []
         self._chars: list[str] = []
         self._timer: Optional[threading.Timer] = None
+        self._timer_gen = 0  # bumped whenever the timer is (re)armed or cancelled
 
     def press(self, t_ms: Optional[float] = None) -> None:
         if t_ms is None:
@@ -96,19 +97,26 @@ class MorseDecoder:
         logger.info("symbol %r  gap=%.0f ms  so_far=%s", sym, gap, "".join(self._symbols))
 
     def _arm_timer(self) -> None:
+        self._timer_gen += 1
+        gen = self._timer_gen
         self._timer = threading.Timer(
-            self._cfg.letter_gap_ms / 1000.0, self._on_timer
+            self._cfg.letter_gap_ms / 1000.0, self._on_timer, args=(gen,)
         )
         self._timer.daemon = True
         self._timer.start()
 
     def _cancel_timer(self) -> None:
+        self._timer_gen += 1  # invalidate any timer that already fired but is blocked on the lock
         if self._timer is not None:
             self._timer.cancel()
             self._timer = None
 
-    def _on_timer(self) -> None:
+    def _on_timer(self, gen: int) -> None:
         with self._lock:
+            if gen != self._timer_gen:
+                # A press arrived (and re-armed/cancelled) between this timer firing
+                # and acquiring the lock; the state is stale, so do nothing.
+                return
             if self._state == "ONE_PRESS":
                 logger.debug("timer: pending press → dot")
                 self._symbols.append(".")
