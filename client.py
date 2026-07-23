@@ -1,7 +1,9 @@
 """Mock client: sends POST requests to the morse server encoding text."""
+import json
 import sys
 import time
 import urllib.request
+from datetime import datetime
 
 MORSE = {
     "A": ".-", "B": "-...", "C": "-.-.", "D": "-..", "E": ".",
@@ -16,7 +18,11 @@ MORSE = {
 
 
 def send_press(url: str) -> None:
-    urllib.request.urlopen(urllib.request.Request(url, data=b""), timeout=5)
+    now = datetime.now()
+    # Server expects {"date": "HH:MM:SS mmm"} with millisecond precision.
+    date_str = now.strftime("%H:%M:%S ") + f"{now.microsecond // 1000:03d}"
+    body = json.dumps({"date": date_str}).encode()
+    urllib.request.urlopen(urllib.request.Request(url, data=body), timeout=5)
 
 
 def send_text(
