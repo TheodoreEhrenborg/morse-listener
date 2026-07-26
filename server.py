@@ -222,7 +222,7 @@ _decoder = MorseDecoder()
 
 
 class _Handler(BaseHTTPRequestHandler):
-    timeout = 10  # seconds; prevents a stalled client from hanging its handler thread forever
+    timeout = 30  # seconds; prevents a stalled client from hanging its handler thread forever
 
     def do_POST(self) -> None:
         length = min(int(self.headers.get("Content-Length", 0)), 1024)
