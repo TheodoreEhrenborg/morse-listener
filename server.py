@@ -8,7 +8,7 @@ import time
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
 
 import certifi
@@ -222,6 +222,8 @@ _decoder = MorseDecoder()
 
 
 class _Handler(BaseHTTPRequestHandler):
+    timeout = 10  # seconds; prevents a stalled client from hanging its handler thread forever
+
     def do_POST(self) -> None:
         length = min(int(self.headers.get("Content-Length", 0)), 1024)
         body = self.rfile.read(length)
@@ -253,7 +255,8 @@ def run(
     if ntfy_topic:
         NtfyPoster(ntfy_topic, ntfy_interval_s, _decoder).start()
         logger.info("ntfy topic=%s  interval=%.0f s", ntfy_topic, ntfy_interval_s)
-    server = HTTPServer((host, port), _Handler)
+    server = ThreadingHTTPServer((host, port), _Handler)
+    server.daemon_threads = True
     logger.info("Listening on %s:%d  dash_gap=%.0f ms  letter_gap=%.0f ms",
                 host, port, _decoder._cfg.dash_gap_ms, _decoder._cfg.letter_gap_ms)
     server.serve_forever()
